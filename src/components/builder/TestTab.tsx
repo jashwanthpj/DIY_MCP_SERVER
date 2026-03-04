@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Play, Square, RefreshCw, Wrench, FileText, MessageSquare, Send, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ interface ServerStatus {
   port?: number;
   pid?: number;
   error?: string;
+  useInProcess?: boolean;
 }
 
 interface InspectorResult {
@@ -33,6 +34,30 @@ export function TestTab({ project }: { project: McpProject }) {
   const [starting, setStarting] = useState(false);
   const [results, setResults] = useState<InspectorResult[]>([]);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/projects/${project.id}/test`, { headers: projectApiHeaders() })
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.useInProcess && data.running) {
+          setStatus({
+            running: true,
+            port: data.port ?? 0,
+            useInProcess: true,
+          });
+        } else if (data.running) {
+          setStatus({
+            running: true,
+            port: data.port,
+            pid: data.pid,
+          });
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [project.id]);
+
   const startServer = async () => {
     setStarting(true);
     try {
@@ -45,7 +70,12 @@ export function TestTab({ project }: { project: McpProject }) {
       if (data.error) {
         setStatus({ running: false, error: data.error });
       } else {
-        setStatus({ running: true, port: data.port, pid: data.pid });
+        setStatus({
+          running: true,
+          port: data.port,
+          pid: data.pid,
+          useInProcess: data.useInProcess,
+        });
       }
     } catch (err) {
       setStatus({ running: false, error: String(err) });
@@ -77,7 +107,9 @@ export function TestTab({ project }: { project: McpProject }) {
                 {status.running && (
                   <Badge variant="default" className="bg-green-600">
                     <CheckCircle2 className="mr-1 h-3 w-3" />
-                    Running on port {status.port}
+                    {status.useInProcess
+                      ? "Running (in-browser test)"
+                      : `Running on port ${status.port}`}
                   </Badge>
                 )}
               </CardTitle>
@@ -112,7 +144,7 @@ export function TestTab({ project }: { project: McpProject }) {
         </CardHeader>
       </Card>
 
-      {status.running && status.port && (
+      {status.running && (status.port != null || status.useInProcess) && (
         <div className="grid grid-cols-[1fr_350px] gap-6">
           <Card>
             <CardContent className="pt-6">
@@ -135,21 +167,21 @@ export function TestTab({ project }: { project: McpProject }) {
                 <TabsContent value="tools" className="mt-4">
                   <ToolsTester
                     project={project}
-                    port={status.port}
+                    port={status.port ?? 0}
                     onResult={addResult}
                   />
                 </TabsContent>
                 <TabsContent value="resources" className="mt-4">
                   <ResourcesTester
                     project={project}
-                    port={status.port}
+                    port={status.port ?? 0}
                     onResult={addResult}
                   />
                 </TabsContent>
                 <TabsContent value="prompts" className="mt-4">
                   <PromptsTester
                     project={project}
-                    port={status.port}
+                    port={status.port ?? 0}
                     onResult={addResult}
                   />
                 </TabsContent>

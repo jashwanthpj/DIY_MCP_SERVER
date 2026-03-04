@@ -42,7 +42,7 @@ function generateToolSchema(fields: ParamField[]): string {
   return `{\n${lines}\n  }`;
 }
 
-function generateHandlerBody(tool: McpTool): string {
+export function generateHandlerBody(tool: McpTool): string {
   const handlerType = tool.handlerType || "code";
 
   if (handlerType === "code") {

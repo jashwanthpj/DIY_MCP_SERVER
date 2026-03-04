@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getProjectWithAccess } from "@/lib/project-access";
 import { startTestServer, stopTestServer, getTestServerStatus } from "@/lib/test-runner";
+import {
+  runToolInProcess,
+  runResourceInProcess,
+  runPromptInProcess,
+} from "@/lib/inprocess-runner";
 import type { McpProject, ToolHandlerType, ToolHandlerConfig } from "@/types/mcp";
 
 function safeParse(value: string, fallback: unknown = {}) {
@@ -111,6 +116,33 @@ async function mcpRequest(
   return data.result;
 }
 
+async function loadFullProject(projectId: string): Promise<McpProject | null> {
+  const full = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: { tools: true, resources: true, prompts: true, envVars: true },
+  });
+  if (!full) return null;
+  return {
+    ...full,
+    createdAt: full.createdAt.toISOString(),
+    updatedAt: full.updatedAt.toISOString(),
+    tools: full.tools.map((t) => ({
+      id: t.id,
+      projectId: t.projectId,
+      name: t.name,
+      description: t.description,
+      inputSchema: safeParse(t.inputSchema, []),
+      handlerType: (t.handlerType || "code") as ToolHandlerType,
+      handlerCode: t.handlerCode,
+      handlerConfig: safeParse(t.handlerConfig, {}) as ToolHandlerConfig,
+    })),
+    prompts: full.prompts.map((p) => ({
+      ...p,
+      arguments: safeParse(p.arguments, []),
+    })),
+  } as McpProject;
+}
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -118,6 +150,9 @@ export async function GET(
   const { id } = await params;
   const project = await getProjectWithAccess(req, id);
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (process.env.VERCEL === "1") {
+    return NextResponse.json({ running: true, port: 0, useInProcess: true });
+  }
   const status = getTestServerStatus(id);
   return NextResponse.json(status);
 }
@@ -133,9 +168,58 @@ export async function POST(
   if (!project)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  const isInProcess = process.env.VERCEL === "1" || body.port === 0;
+
   if (body.action === "stop") {
+    if (isInProcess) return NextResponse.json({ stopped: true });
     const stopped = stopTestServer(id);
     return NextResponse.json({ stopped });
+  }
+
+  if (body.action === "call_tool" && isInProcess) {
+    try {
+      const fullProject = await loadFullProject(id);
+      if (!fullProject) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      const result = await runToolInProcess(fullProject, body.toolName, body.params || {});
+      return NextResponse.json(result);
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : String(err) },
+        { status: 500 }
+      );
+    }
+  }
+
+  if (body.action === "read_resource" && isInProcess) {
+    try {
+      const fullProject = await loadFullProject(id);
+      if (!fullProject) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      const result = await runResourceInProcess(fullProject, body.uri);
+      return NextResponse.json(result);
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : String(err) },
+        { status: 500 }
+      );
+    }
+  }
+
+  if (body.action === "get_prompt" && isInProcess) {
+    try {
+      const fullProject = await loadFullProject(id);
+      if (!fullProject) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      const result = runPromptInProcess(fullProject, body.promptName, body.args || {});
+      return NextResponse.json(result);
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : String(err) },
+        { status: 500 }
+      );
+    }
+  }
+
+  if (body.action === "start" && process.env.VERCEL === "1") {
+    return NextResponse.json({ running: true, port: 0, useInProcess: true });
   }
 
   if (body.action === "call_tool") {
@@ -182,33 +266,11 @@ export async function POST(
     }
   }
 
-  const fullProject = await prisma.project.findUnique({
-    where: { id },
-    include: { tools: true, resources: true, prompts: true, envVars: true },
-  });
-
+  const fullProject = await loadFullProject(id);
   if (!fullProject)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const mcpProject = {
-    ...fullProject,
-    createdAt: fullProject.createdAt.toISOString(),
-    updatedAt: fullProject.updatedAt.toISOString(),
-    tools: fullProject.tools.map((t) => ({
-      id: t.id,
-      projectId: t.projectId,
-      name: t.name,
-      description: t.description,
-      inputSchema: safeParse(t.inputSchema, []),
-      handlerType: (t.handlerType || "code") as ToolHandlerType,
-      handlerCode: t.handlerCode,
-      handlerConfig: safeParse(t.handlerConfig, {}) as ToolHandlerConfig,
-    })),
-    prompts: fullProject.prompts.map((p) => ({
-      ...p,
-      arguments: safeParse(p.arguments, []),
-    })),
-  } as McpProject;
+  const mcpProject = fullProject;
 
   try {
     const { port, pid } = await startTestServer(mcpProject);
