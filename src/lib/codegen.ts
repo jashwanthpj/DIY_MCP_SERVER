@@ -42,7 +42,11 @@ function generateToolSchema(fields: ParamField[]): string {
   return `{\n${lines}\n  }`;
 }
 
-export function generateHandlerBody(tool: McpTool): string {
+export function generateHandlerBody(
+  tool: McpTool,
+  options?: { inProcess?: boolean }
+): string {
+  const inProcess = options?.inProcess === true;
   const handlerType = tool.handlerType || "code";
 
   if (handlerType === "code") {
@@ -106,7 +110,10 @@ export function generateHandlerBody(tool: McpTool): string {
 
       if (config.dbType === "pinecone") {
         const ns = config.namespace ? `, namespace: ${JSON.stringify(config.namespace)}` : "";
-        return `const { Pinecone } = await import("@pinecone-database/pinecone");
+        const pineconeLoad = inProcess
+          ? `const { Pinecone } = globalThis.__PINECONE;`
+          : `const { Pinecone } = await import("@pinecone-database/pinecone");`;
+        return `${pineconeLoad}
     const pc = new Pinecone({ apiKey: process.env.${config.connectionEnvVar}! });
     const index = pc.index(${JSON.stringify(collection)});
     const queryText = \`${queryTemplate}\`;
@@ -120,7 +127,10 @@ export function generateHandlerBody(tool: McpTool): string {
       }
 
       if (config.dbType === "chromadb") {
-        return `const { ChromaClient } = await import("chromadb");
+        const chromaLoad = inProcess
+          ? `const { ChromaClient } = globalThis.__CHROMADB;`
+          : `const { ChromaClient } = await import("chromadb");`;
+        return `${chromaLoad}
     const client = new ChromaClient({ path: process.env.${config.connectionEnvVar} || "http://localhost:8000" });
     const col = await client.getCollection({ name: ${JSON.stringify(collection)} });
     const queryText = \`${queryTemplate}\`;
@@ -132,7 +142,10 @@ export function generateHandlerBody(tool: McpTool): string {
         const apiKeyPart = config.namespace
           ? `, apiKey: process.env.${config.namespace}`
           : "";
-        return `const { QdrantClient } = await import("@qdrant/js-client-rest");
+        const qdrantLoad = inProcess
+          ? `const { QdrantClient } = globalThis.__QDRANT;`
+          : `const { QdrantClient } = await import("@qdrant/js-client-rest");`;
+        return `${qdrantLoad}
     const client = new QdrantClient({ url: process.env.${config.connectionEnvVar} || "http://localhost:6333"${apiKeyPart} });
     const queryText = \`${queryTemplate}\`;
     const results = await client.query(${JSON.stringify(collection)}, { query: queryText, limit: ${topK} });
@@ -155,7 +168,10 @@ export function generateHandlerBody(tool: McpTool): string {
     }
 
     if (config.dbType === "postgresql") {
-      return `const { Pool } = await import("pg");
+      const pgLoad = inProcess
+        ? `const { Pool } = globalThis.__PG;`
+        : `const { Pool } = await import("pg");`;
+      return `${pgLoad}
     const pool = new Pool({ connectionString: process.env.${config.connectionEnvVar} });
     const result = await pool.query(${JSON.stringify(queryText)}, [${placeholders.join(", ")}]);
     await pool.end();
@@ -163,14 +179,20 @@ export function generateHandlerBody(tool: McpTool): string {
     }
 
     if (config.dbType === "mysql") {
-      return `const mysql = await import("mysql2/promise");
+      const mysqlLoad = inProcess
+        ? `const mysql = globalThis.__MYSQL2;`
+        : `const mysql = await import("mysql2/promise");`;
+      return `${mysqlLoad}
     const conn = await mysql.createConnection(process.env.${config.connectionEnvVar}!);
     const [rows] = await conn.execute(${JSON.stringify(queryText)}, [${placeholders.join(", ")}]);
     await conn.end();
     return { content: [{ type: "text", text: JSON.stringify(rows, null, 2) }] };`;
     }
 
-    return `const Database = (await import("better-sqlite3")).default;
+    const sqliteLoad = inProcess
+      ? `const Database = globalThis.__BETTER_SQLITE3;`
+      : `const Database = (await import("better-sqlite3")).default;`;
+    return `${sqliteLoad}
     const db = new Database(process.env.${config.connectionEnvVar} || "./data.db");
     const rows = db.prepare(${JSON.stringify(queryText)}).all(${placeholders.join(", ")});
     db.close();

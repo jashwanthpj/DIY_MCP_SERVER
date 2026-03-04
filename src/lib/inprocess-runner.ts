@@ -1,6 +1,21 @@
 import { generateHandlerBody } from "./codegen";
 import type { McpProject } from "@/types/mcp";
 
+function ensureDbModulesLoaded(): void {
+  if (typeof (globalThis as Record<string, unknown>).__PG !== "undefined") return;
+  try {
+    (globalThis as Record<string, unknown>).__PG = require("pg");
+    (globalThis as Record<string, unknown>).__MYSQL2 = require("mysql2/promise");
+    const sqlite = require("better-sqlite3");
+    (globalThis as Record<string, unknown>).__BETTER_SQLITE3 = sqlite.default ?? sqlite;
+    (globalThis as Record<string, unknown>).__PINECONE = require("@pinecone-database/pinecone");
+    (globalThis as Record<string, unknown>).__CHROMADB = require("chromadb");
+    (globalThis as Record<string, unknown>).__QDRANT = require("@qdrant/js-client-rest");
+  } catch {
+    // Some modules may fail (e.g. native deps); set what we have
+  }
+}
+
 function applyEnvVars(envVars: { key: string; value: string }[] = []): () => void {
   const prev: Record<string, string | undefined> = {};
   for (const v of envVars) {
@@ -25,7 +40,8 @@ export async function runToolInProcess(
 
   const paramNames = (tool.inputSchema || []).map((f) => f.name);
   const values = paramNames.map((p) => params[p]);
-  const body = generateHandlerBody(tool);
+  ensureDbModulesLoaded();
+  const body = generateHandlerBody(tool, { inProcess: true });
 
   const restoreEnv = applyEnvVars(
     (project.envVars || []).map((v) => ({ key: v.key, value: v.value }))
