@@ -1,9 +1,6 @@
 import { generateHandlerBody } from "./codegen";
 import type { McpProject } from "@/types/mcp";
 
-const DB_QUERY_ERROR =
-  "Database tools are not supported in the deployed test. Use custom code or HTTP request handlers, or run the app locally to test.";
-
 function applyEnvVars(envVars: { key: string; value: string }[] = []): () => void {
   const prev: Record<string, string | undefined> = {};
   for (const v of envVars) {
@@ -25,10 +22,6 @@ export async function runToolInProcess(
 ): Promise<unknown> {
   const tool = (project.tools || []).find((t) => t.name === toolName);
   if (!tool) throw new Error(`Tool not found: ${toolName}`);
-
-  if (tool.handlerType === "db_query") {
-    throw new Error(DB_QUERY_ERROR);
-  }
 
   const paramNames = (tool.inputSchema || []).map((f) => f.name);
   const values = paramNames.map((p) => params[p]);
