@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getProjectWithAccess } from "@/lib/project-access";
 
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string; toolId: string }> }
 ) {
-  const { toolId } = await params;
+  const { id, toolId } = await params;
+  const project = await getProjectWithAccess(req, id);
+  if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const body = await req.json();
   const tool = await prisma.tool.update({
     where: { id: toolId },
@@ -26,10 +29,12 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string; toolId: string }> }
 ) {
-  const { toolId } = await params;
+  const { id, toolId } = await params;
+  const project = await getProjectWithAccess(req, id);
+  if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
   await prisma.tool.delete({ where: { id: toolId } });
   return NextResponse.json({ success: true });
 }

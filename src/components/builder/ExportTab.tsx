@@ -16,6 +16,7 @@ import {
   generateReadme,
 } from "@/lib/codegen";
 import type { McpProject } from "@/types/mcp";
+import { projectApiHeaders } from "@/lib/anon-id";
 
 export function ExportTab({ project }: { project: McpProject }) {
   const [downloading, setDownloading] = useState(false);
@@ -31,7 +32,9 @@ export function ExportTab({ project }: { project: McpProject }) {
   const downloadZip = async () => {
     setDownloading(true);
     try {
-      const res = await fetch(`/api/projects/${project.id}/export?transport=${transport}`);
+      const res = await fetch(`/api/projects/${project.id}/export?transport=${transport}`, {
+        headers: projectApiHeaders(),
+      });
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

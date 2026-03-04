@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getProjectWithAccess } from "@/lib/project-access";
 import archiver from "archiver";
 import { PassThrough } from "stream";
 import {
@@ -15,27 +16,30 @@ import type { McpProject } from "@/types/mcp";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const project = await getProjectWithAccess(req, id);
+  if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
   const { searchParams } = new URL(req.url);
   const transport = (searchParams.get("transport") || "sse") as TransportMode;
 
-  const project = await prisma.project.findUnique({
+  const fullProject = await prisma.project.findUnique({
     where: { id },
     include: { tools: true, resources: true, prompts: true, envVars: true },
   });
 
-  if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!fullProject) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const mcpProject: McpProject = {
-    ...project,
-    createdAt: project.createdAt.toISOString(),
-    updatedAt: project.updatedAt.toISOString(),
-    tools: project.tools.map((t) => ({
+    ...fullProject,
+    createdAt: fullProject.createdAt.toISOString(),
+    updatedAt: fullProject.updatedAt.toISOString(),
+    tools: fullProject.tools.map((t) => ({
       ...t,
       handlerType: t.handlerType as "code" | "http_request" | "db_query",
       inputSchema: JSON.parse(t.inputSchema),
       handlerConfig: JSON.parse(t.handlerConfig),
     })),
-    prompts: project.prompts.map((p) => ({
+    prompts: fullProject.prompts.map((p) => ({
       ...p,
       arguments: JSON.parse(p.arguments),
     })),

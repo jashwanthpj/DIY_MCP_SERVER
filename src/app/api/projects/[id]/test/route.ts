@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { getProjectWithAccess } from "@/lib/project-access";
 import { startTestServer, stopTestServer, getTestServerStatus } from "@/lib/test-runner";
 import type { McpProject, ToolHandlerType, ToolHandlerConfig } from "@/types/mcp";
 
@@ -111,10 +112,12 @@ async function mcpRequest(
 }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const project = await getProjectWithAccess(req, id);
+  if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const status = getTestServerStatus(id);
   return NextResponse.json(status);
 }
@@ -125,6 +128,10 @@ export async function POST(
 ) {
   const { id } = await params;
   const body = await req.json();
+
+  const project = await getProjectWithAccess(req, id);
+  if (!project)
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   if (body.action === "stop") {
     const stopped = stopTestServer(id);
@@ -175,19 +182,19 @@ export async function POST(
     }
   }
 
-  const project = await prisma.project.findUnique({
+  const fullProject = await prisma.project.findUnique({
     where: { id },
     include: { tools: true, resources: true, prompts: true, envVars: true },
   });
 
-  if (!project)
+  if (!fullProject)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const mcpProject = {
-    ...project,
-    createdAt: project.createdAt.toISOString(),
-    updatedAt: project.updatedAt.toISOString(),
-    tools: project.tools.map((t) => ({
+    ...fullProject,
+    createdAt: fullProject.createdAt.toISOString(),
+    updatedAt: fullProject.updatedAt.toISOString(),
+    tools: fullProject.tools.map((t) => ({
       id: t.id,
       projectId: t.projectId,
       name: t.name,
@@ -197,7 +204,7 @@ export async function POST(
       handlerCode: t.handlerCode,
       handlerConfig: safeParse(t.handlerConfig, {}) as ToolHandlerConfig,
     })),
-    prompts: project.prompts.map((p) => ({
+    prompts: fullProject.prompts.map((p) => ({
       ...p,
       arguments: safeParse(p.arguments, []),
     })),

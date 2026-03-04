@@ -13,6 +13,7 @@ import { PromptsTab } from "@/components/builder/PromptsTab";
 import { EnvVarsTab } from "@/components/builder/EnvVarsTab";
 import { TestTab } from "@/components/builder/TestTab";
 import { ExportTab } from "@/components/builder/ExportTab";
+import { projectApiHeaders } from "@/lib/anon-id";
 
 export default function BuilderPage() {
   const params = useParams();
@@ -22,7 +23,7 @@ export default function BuilderPage() {
   const [loading, setLoading] = useState(true);
 
   const fetchProject = useCallback(async () => {
-    const res = await fetch(`/api/projects/${projectId}`);
+    const res = await fetch(`/api/projects/${projectId}`, { headers: projectApiHeaders() });
     if (!res.ok) {
       router.push("/");
       return;

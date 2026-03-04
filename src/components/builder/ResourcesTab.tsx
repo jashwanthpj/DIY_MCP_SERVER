@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CodeEditor } from "@/components/builder/CodeEditor";
 import type { McpProject, McpResource } from "@/types/mcp";
+import { projectApiHeaders } from "@/lib/anon-id";
 
 export function ResourcesTab({ project, onUpdate }: { project: McpProject; onUpdate: () => void }) {
   const [selectedId, setSelectedId] = useState<string | null>(
@@ -22,7 +23,7 @@ export function ResourcesTab({ project, onUpdate }: { project: McpProject; onUpd
   const addResource = async () => {
     const res = await fetch(`/api/projects/${project.id}/resources`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...projectApiHeaders() },
       body: JSON.stringify({ name: "new_resource", uri: "resource://example" }),
     });
     const resource = await res.json();
@@ -31,7 +32,7 @@ export function ResourcesTab({ project, onUpdate }: { project: McpProject; onUpd
   };
 
   const deleteResource = async (resourceId: string) => {
-    await fetch(`/api/projects/${project.id}/resources/${resourceId}`, { method: "DELETE" });
+    await fetch(`/api/projects/${project.id}/resources/${resourceId}`, { method: "DELETE", headers: projectApiHeaders() });
     if (selectedId === resourceId) setSelectedId(null);
     onUpdate();
   };
@@ -114,7 +115,7 @@ function ResourceEditor({
     setSaving(true);
     await fetch(`/api/projects/${projectId}/resources/${resource.id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...projectApiHeaders() },
       body: JSON.stringify({ name, uri, description, mimeType, handlerCode }),
     });
     setSaving(false);

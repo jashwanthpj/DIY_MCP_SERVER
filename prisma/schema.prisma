@@ -3,12 +3,13 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model Project {
   id          String        @id @default(uuid())
+  ownerId     String        @default("")
   name        String
   description String        @default("")
   version     String        @default("1.0.0")

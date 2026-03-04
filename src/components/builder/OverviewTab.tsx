@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { McpProject } from "@/types/mcp";
+import { projectApiHeaders } from "@/lib/anon-id";
 
 export function OverviewTab({ project, onUpdate }: { project: McpProject; onUpdate: () => void }) {
   const [name, setName] = useState(project.name);
@@ -19,7 +20,7 @@ export function OverviewTab({ project, onUpdate }: { project: McpProject; onUpda
     setSaving(true);
     await fetch(`/api/projects/${project.id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...projectApiHeaders() },
       body: JSON.stringify({ name, description, version }),
     });
     setSaving(false);

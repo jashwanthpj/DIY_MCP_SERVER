@@ -19,6 +19,7 @@ import type {
   McpProject, McpTool, ParamField, ToolHandlerType, ToolHandlerConfig,
   HttpRequestConfig, DbQueryConfig, AllDbType, VectorDbType,
 } from "@/types/mcp";
+import { projectApiHeaders } from "@/lib/anon-id";
 
 const HANDLER_TYPES: { value: ToolHandlerType; label: string; icon: React.ReactNode; description: string }[] = [
   {
@@ -73,7 +74,7 @@ export function ToolsTab({ project, onUpdate }: { project: McpProject; onUpdate:
   const addTool = async () => {
     const res = await fetch(`/api/projects/${project.id}/tools`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...projectApiHeaders() },
       body: JSON.stringify({ name: "new_tool", description: "A new tool" }),
     });
     const tool = await res.json();
@@ -82,7 +83,7 @@ export function ToolsTab({ project, onUpdate }: { project: McpProject; onUpdate:
   };
 
   const deleteTool = async (toolId: string) => {
-    await fetch(`/api/projects/${project.id}/tools/${toolId}`, { method: "DELETE" });
+    await fetch(`/api/projects/${project.id}/tools/${toolId}`, { method: "DELETE", headers: projectApiHeaders() });
     if (selectedId === toolId) setSelectedId(null);
     onUpdate();
   };
@@ -185,7 +186,7 @@ function ToolEditor({
     setSaving(true);
     await fetch(`/api/projects/${projectId}/tools/${tool.id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...projectApiHeaders() },
       body: JSON.stringify({ name, description, inputSchema, handlerType, handlerCode, handlerConfig }),
     });
     setSaving(false);

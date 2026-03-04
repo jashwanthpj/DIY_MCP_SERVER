@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import type { McpProject } from "@/types/mcp";
+import { projectApiHeaders } from "@/lib/anon-id";
 
 interface ServerStatus {
   running: boolean;
@@ -37,7 +38,7 @@ export function TestTab({ project }: { project: McpProject }) {
     try {
       const res = await fetch(`/api/projects/${project.id}/test`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...projectApiHeaders() },
         body: JSON.stringify({ action: "start" }),
       });
       const data = await res.json();
@@ -55,7 +56,7 @@ export function TestTab({ project }: { project: McpProject }) {
   const stopServer = async () => {
     await fetch(`/api/projects/${project.id}/test`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...projectApiHeaders() },
       body: JSON.stringify({ action: "stop" }),
     });
     setStatus({ running: false });
@@ -249,7 +250,7 @@ function ToolsTester({
 
       const res = await fetch(`/api/projects/${project.id}/test`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...projectApiHeaders() },
         body: JSON.stringify({
           action: "call_tool",
           port,
@@ -354,7 +355,7 @@ function ResourcesTester({
     try {
       const res = await fetch(`/api/projects/${project.id}/test`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...projectApiHeaders() },
         body: JSON.stringify({ action: "read_resource", port, uri }),
       });
       const data = await res.json();
@@ -427,7 +428,7 @@ function PromptsTester({
     try {
       const res = await fetch(`/api/projects/${project.id}/test`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...projectApiHeaders() },
         body: JSON.stringify({
           action: "get_prompt",
           port,

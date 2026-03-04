@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import type { McpProject, McpPrompt, PromptArgument } from "@/types/mcp";
+import { projectApiHeaders } from "@/lib/anon-id";
 
 export function PromptsTab({ project, onUpdate }: { project: McpProject; onUpdate: () => void }) {
   const [selectedId, setSelectedId] = useState<string | null>(
@@ -22,7 +23,7 @@ export function PromptsTab({ project, onUpdate }: { project: McpProject; onUpdat
   const addPrompt = async () => {
     const res = await fetch(`/api/projects/${project.id}/prompts`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...projectApiHeaders() },
       body: JSON.stringify({ name: "new_prompt", description: "A new prompt" }),
     });
     const prompt = await res.json();
@@ -31,7 +32,7 @@ export function PromptsTab({ project, onUpdate }: { project: McpProject; onUpdat
   };
 
   const deletePrompt = async (promptId: string) => {
-    await fetch(`/api/projects/${project.id}/prompts/${promptId}`, { method: "DELETE" });
+    await fetch(`/api/projects/${project.id}/prompts/${promptId}`, { method: "DELETE", headers: projectApiHeaders() });
     if (selectedId === promptId) setSelectedId(null);
     onUpdate();
   };
@@ -113,7 +114,7 @@ function PromptEditor({
     setSaving(true);
     await fetch(`/api/projects/${projectId}/prompts/${prompt.id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...projectApiHeaders() },
       body: JSON.stringify({ name, description, arguments: args, template }),
     });
     setSaving(false);

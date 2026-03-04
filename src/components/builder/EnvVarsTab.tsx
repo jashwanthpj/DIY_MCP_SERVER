@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { McpProject, EnvVar } from "@/types/mcp";
+import { projectApiHeaders } from "@/lib/anon-id";
 
 export function EnvVarsTab({ project, onUpdate }: { project: McpProject; onUpdate: () => void }) {
   const envVars = project.envVars || [];
@@ -14,7 +15,7 @@ export function EnvVarsTab({ project, onUpdate }: { project: McpProject; onUpdat
   const addEnvVar = async () => {
     await fetch(`/api/projects/${project.id}/env`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...projectApiHeaders() },
       body: JSON.stringify({ key: "NEW_VARIABLE", value: "", description: "" }),
     });
     onUpdate();
@@ -23,14 +24,14 @@ export function EnvVarsTab({ project, onUpdate }: { project: McpProject; onUpdat
   const updateEnvVar = async (envVar: Partial<EnvVar> & { id: string }) => {
     await fetch(`/api/projects/${project.id}/env`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...projectApiHeaders() },
       body: JSON.stringify(envVar),
     });
     onUpdate();
   };
 
   const deleteEnvVar = async (envId: string) => {
-    await fetch(`/api/projects/${project.id}/env?envId=${envId}`, { method: "DELETE" });
+    await fetch(`/api/projects/${project.id}/env?envId=${envId}`, { method: "DELETE", headers: projectApiHeaders() });
     onUpdate();
   };
 

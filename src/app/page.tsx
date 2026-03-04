@@ -13,6 +13,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import { projectApiHeaders } from "@/lib/anon-id";
 
 interface ProjectListItem {
   id: string;
@@ -33,7 +34,7 @@ export default function Dashboard() {
   const router = useRouter();
 
   const fetchProjects = useCallback(async () => {
-    const res = await fetch("/api/projects");
+    const res = await fetch("/api/projects", { headers: projectApiHeaders() });
     const data = await res.json();
     setProjects(data);
     setLoading(false);
@@ -44,7 +45,7 @@ export default function Dashboard() {
   const createProject = async () => {
     await fetch("/api/projects", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...projectApiHeaders() },
       body: JSON.stringify({ name: newName || "Untitled MCP Server", description: newDesc }),
     });
     setNewName("");
@@ -56,7 +57,7 @@ export default function Dashboard() {
   const deleteProject = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm("Delete this project? This cannot be undone.")) return;
-    await fetch(`/api/projects/${id}`, { method: "DELETE" });
+    await fetch(`/api/projects/${id}`, { method: "DELETE", headers: projectApiHeaders() });
     fetchProjects();
   };
 
