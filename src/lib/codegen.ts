@@ -192,8 +192,11 @@ export function generateHandlerBody(
     const sqliteLoad = inProcess
       ? `const Database = globalThis.__BETTER_SQLITE3;`
       : `const Database = (await import("better-sqlite3")).default;`;
+    const sqlitePath = inProcess
+      ? `process.env.${config.connectionEnvVar} || "./data.db"`
+      : `process.env.${config.connectionEnvVar} || join(__projectRoot, "data.db")`;
     return `${sqliteLoad}
-    const db = new Database(process.env.${config.connectionEnvVar} || "./data.db");
+    const db = new Database(${sqlitePath});
     const rows = db.prepare(${JSON.stringify(queryText)}).all(${placeholders.join(", ")});
     db.close();
     return { content: [{ type: "text", text: JSON.stringify(rows, null, 2) }] };`;
@@ -301,6 +304,15 @@ export function generateServerCode(
   const prompts = project.prompts || [];
 
   const imports = [
+    `import { fileURLToPath } from "url";`,
+    `import { dirname, join } from "path";`,
+    `import { config } from "dotenv";`,
+    ``,
+    `// Load .env from project root (works when MCP is started from any cwd)`,
+    `const __dirname = dirname(fileURLToPath(import.meta.url));`,
+    `config({ path: join(__dirname, "..", ".env") });`,
+    `const __projectRoot = join(__dirname, "..");`,
+    ``,
     `import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";`,
     `import express from "express";`,
     `import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";`,
@@ -387,8 +399,9 @@ app.delete("/mcp", async (req, res) => {
 });
 
 const PORT = parseInt(process.env.PORT || "3001");
-app.listen(PORT, () => {
-  console.log(\`${project.name} MCP server running on http://localhost:\${PORT}/mcp\`);
+const HOST = process.env.HOST || "0.0.0.0";
+app.listen(PORT, HOST, () => {
+  console.log(\`${project.name} MCP server running on http://\${HOST}:\${PORT}/mcp\`);
 });
 `;
 }
@@ -398,6 +411,7 @@ export function generatePackageJson(project: McpProject, transport: TransportMod
   const dbDeps = needsDbDeps(tools);
 
   const deps: Record<string, string> = {
+    "dotenv": "^16.4.0",
     "@modelcontextprotocol/sdk": "^1.11.0",
     zod: "^3.23.0",
   };
