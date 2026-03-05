@@ -88,3 +88,38 @@ export interface McpProject {
   prompts?: McpPrompt[];
   envVars?: EnvVar[];
 }
+
+export type AgentEntityType = "tool" | "resource" | "prompt" | "env";
+
+export interface GeneratedEntity {
+  _entityType: AgentEntityType;
+  _action: "create" | "edit" | "delete";
+  name: string;
+  description: string;
+  // Tool fields
+  inputSchema?: ParamField[];
+  handlerType?: ToolHandlerType;
+  handlerCode?: string;
+  handlerConfig?: ToolHandlerConfig;
+  // Resource fields
+  uri?: string;
+  mimeType?: string;
+  // Prompt fields
+  arguments?: PromptArgument[];
+  template?: string;
+  // Env fields
+  key?: string;
+  value?: string;
+  // UI state
+  saved?: boolean;
+  saving?: boolean;
+  existingId?: string;
+}
+
+export interface AgentChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  thinking?: string;
+  entities?: GeneratedEntity[];
+}

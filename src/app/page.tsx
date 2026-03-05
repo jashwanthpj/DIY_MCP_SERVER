@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Server, Wrench, FileText, MessageSquare } from "lucide-react";
+import { Plus, Trash2, Server, Wrench, FileText, MessageSquare, Sparkles, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,12 +26,16 @@ interface ProjectListItem {
   _count: { tools: number; resources: number; prompts: number };
 }
 
+type BuildMode = "agent" | "manual" | null;
+
 export default function Dashboard() {
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [buildMode, setBuildMode] = useState<BuildMode>(null);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
+  const [creating, setCreating] = useState(false);
   const router = useRouter();
 
   const fetchProjects = useCallback(async () => {
@@ -42,16 +47,29 @@ export default function Dashboard() {
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
+  const resetDialog = () => {
+    setBuildMode(null);
+    setNewName("");
+    setNewDesc("");
+    setCreating(false);
+  };
+
   const createProject = async () => {
-    await fetch("/api/projects", {
+    setCreating(true);
+    const res = await fetch("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...projectApiHeaders() },
       body: JSON.stringify({ name: newName || "Untitled MCP Server", description: newDesc }),
     });
-    setNewName("");
-    setNewDesc("");
+    const project = await res.json();
+    resetDialog();
     setDialogOpen(false);
-    fetchProjects();
+
+    if (buildMode === "agent") {
+      router.push(`/builder/${project.id}?mode=agent`);
+    } else {
+      router.push(`/builder/${project.id}`);
+    }
   };
 
   const deleteProject = async (id: string, e: React.MouseEvent) => {
@@ -69,47 +87,111 @@ export default function Dashboard() {
             <Server className="h-6 w-6 text-primary" />
             <h1 className="text-xl font-bold">DIY MCP Server Builder</h1>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                New Server
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetDialog(); }}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Server
+                </Button>
+              </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>Create MCP Server</DialogTitle>
                 <DialogDescription>
-                  Give your new MCP server a name and description.
+                  {!buildMode
+                    ? "Choose how you'd like to build your MCP server."
+                    : "Give your new MCP server a name and description."}
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="name">Server Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="my-mcp-server"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && createProject()}
-                  />
+
+              {!buildMode ? (
+                <div className="grid grid-cols-2 gap-4 py-4">
+                  <button
+                    onClick={() => setBuildMode("agent")}
+                    className="group flex flex-col items-center gap-3 rounded-xl border-2 border-border p-6 text-center transition-all hover:border-primary hover:bg-primary/5 cursor-pointer"
+                  >
+                    <div className="rounded-full bg-primary/10 p-3 group-hover:bg-primary/20 transition-colors">
+                      <Sparkles className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">AI Agent</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Describe what you need in plain English and let our AI build the tools for you
+                      </p>
+                    </div>
+                    <Badge variant="secondary" className="text-[10px]">Recommended for beginners</Badge>
+                  </button>
+
+                  <button
+                    onClick={() => setBuildMode("manual")}
+                    className="group flex flex-col items-center gap-3 rounded-xl border-2 border-border p-6 text-center transition-all hover:border-primary hover:bg-primary/5 cursor-pointer"
+                  >
+                    <div className="rounded-full bg-muted p-3 group-hover:bg-muted/80 transition-colors">
+                      <Settings2 className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">Manual Builder</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Use the form-based builder to create tools, resources, and prompts step by step
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="text-[10px]">Full control</Badge>
+                  </button>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="desc">Description</Label>
-                  <Textarea
-                    id="desc"
-                    placeholder="A brief description of what your server does..."
-                    value={newDesc}
-                    onChange={(e) => setNewDesc(e.target.value)}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                <Button onClick={createProject}>Create</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    <button onClick={() => setBuildMode(null)} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                      &larr; Change mode
+                    </button>
+                    <Badge variant={buildMode === "agent" ? "default" : "outline"} className="text-[10px]">
+                      {buildMode === "agent" ? (
+                        <><Sparkles className="mr-1 h-3 w-3" />AI Agent</>
+                      ) : (
+                        <><Settings2 className="mr-1 h-3 w-3" />Manual</>
+                      )}
+                    </Badge>
+                  </div>
+                  <div className="grid gap-4 py-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="name">Server Name</Label>
+                      <Input
+                        id="name"
+                        placeholder="my-mcp-server"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && createProject()}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="desc">Description</Label>
+                      <Textarea
+                        id="desc"
+                        placeholder="A brief description of what your server does..."
+                        value={newDesc}
+                        onChange={(e) => setNewDesc(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => { setDialogOpen(false); resetDialog(); }}>
+                      Cancel
+                    </Button>
+                    <Button onClick={createProject} disabled={creating}>
+                      {creating ? "Creating..." : buildMode === "agent" ? (
+                        <><Sparkles className="mr-2 h-4 w-4" />Create & Open Agent</>
+                      ) : (
+                        "Create"
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </>
+              )}
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </header>
 
